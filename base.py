@@ -1,3 +1,3 @@
-TOKEN = "token from BotFather"
+TOKEN = "token bot"
 
-GROUP_ID = "-1001652004653"
+GROUP_ID = "id group for send data about ordered meals"
