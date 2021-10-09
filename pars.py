@@ -1,4 +1,4 @@
-from bs4 import BeautifulSoup as bf
+from bs4 import BeautifulSoup
 import requests as req
 import datetime as dt
 import openpyxl, os
@@ -13,7 +13,7 @@ def eating(day):
     if wkd != 6:
         try:
             resp = req.get('http://school09.ru/vse-stati/main/food1').text
-            soup = bf(resp, "html.parser").find_all("ul", "easyfolderlisting")[0]
+            soup = BeautifulSoup(resp, "html.parser").find_all("ul", "easyfolderlisting")[0]
 
             food = [[str(_)[15:32], str(_)[190:200], str(_)[130:172]] for _ in soup if _ != "\n"]
             if day == 0:
