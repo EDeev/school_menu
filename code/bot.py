@@ -26,7 +26,15 @@ dn = sql.Now('../db/now.db')
 @dp.message_handler(commands="start")
 async def start(message: types.Message):
     if 0 < int(message.chat.id):
-        await message.answer("Ghdbtn", types.ParseMode.MARKDOWN)
+        await message.answer("Это бот для заказов питания!\n\nДля того чтобы начать использование вам надо вызвать "
+                             "команду <b>/add_group</b>. Вам будет выдано два кода для двух групп, первая ваша "
+                             "классная группа со всеми учениками, вторая ваша личная в которую будут приходить "
+                             "сообщения с заказами для удобства отслеживания! Для совершения заказа ученикам надо "
+                             "будет вызвать команду <b>/eat</b> и из меню кнопок выбрать необходимый заказ, "
+                             "уведомление о нём сразу же поступит во вторую группу!\n\nТакже есть две команды "
+                             "*/today* и */tomorrow* с помощью них вы иногда можете посмотреть питание на сегодня и "
+                             "на завтра, но работают команды не стабильно из-за нестабильности выкладки школами меню "
+                             "питания!", types.ParseMode.HTML)
 
 
 # ОБНОВЛЕНИЕ АЙДИ ГРУППЫ
@@ -409,7 +417,7 @@ async def time(wait_for):
 
         data = db.get_day()
 
-        if date != data and hour == 6:
+        if date != data and hour == 11:
             for ids in db.get_spec_groups():
                 group = du.get_first_group_id(ids[0])
 
