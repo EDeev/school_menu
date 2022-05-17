@@ -1,4 +1,4 @@
-import logging, asyncio, random
+import logging, asyncio, random, pymorphy2
 import base, pars, sql, os
 import datetime as dt
 
@@ -6,23 +6,27 @@ from aiogram import Bot, Dispatcher, executor, types
 
 # log level
 logging.basicConfig(level=logging.INFO)
+morph = pymorphy2.MorphAnalyzer()
 
 # bot init
 bot = Bot(token=base.TOKEN)
 dp = Dispatcher(bot)
+
+# create now.db
+file = open('../db/now.db', 'w+')
+file.close()
 
 # db init
 db = sql.Base('../db/base.db')
 du = sql.User('../db/users.db')
 dg = sql.Group('../db/groups.db')
 dn = sql.Now('../db/now.db')
-dn.check_group()
 
 
 @dp.message_handler(commands="start")
 async def start(message: types.Message):
-    if 0 > int(message.chat.id):
-        await message.answer("", types.ParseMode.MARKDOWN)
+    if 0 < int(message.chat.id):
+        await message.answer("Ghdbtn", types.ParseMode.MARKDOWN)
 
 
 # ОБНОВЛЕНИЕ АЙДИ ГРУППЫ
@@ -35,12 +39,50 @@ async def chat_reload(message: types.Message):
 # КОМАНДЫ
 @dp.message_handler(commands="help")
 async def hlp(message: types.Message):
-    await message.answer("*Инструкция использования:*\n\n"
-                         "*/eat* - с помощью этой команды вы можете заказать питание\n"
-                         "*/today* - команда выдающая меню на сегодня\n"
-                         "*/tomorrow* - команда выдающая меню на завтра\n\n"
-                         "*/add_group* - команда выдающая меню на завтра\n"
-                         "*/del_group* - команда выдающая меню на завтра\n", types.ParseMode.MARKDOWN)
+    if 0 < int(message.chat.id):
+        await message.answer("*Инструкция использования:*\n\n"
+                             "*/eat* - с помощью этой команды вы можете заказать питание\n"
+                             "*/today* - команда выдающая меню на сегодня\n"
+                             "*/tomorrow* - команда выдающая меню на завтра\n\n"
+                             "*/add_group* - команда выдающая меню на завтра\n"
+                             "*/del_group* - команда выдающая меню на завтра\n", types.ParseMode.MARKDOWN)
+    else:
+        await message.answer("*Инструкция использования:*\n\n"
+                             "*/eat* - с помощью этой команды вы можете заказать питание\n"
+                             "*/today* - команда выдающая меню на сегодня\n"
+                             "*/tomorrow* - команда выдающая меню на завтра\n", types.ParseMode.MARKDOWN)
+
+
+@dp.message_handler(commands="stat")
+async def stat(message: types.Message):
+    if 0 > int(message.chat.id):
+        group_id = message.chat.id
+        if du.group_exists(group_id):
+            group_id = du.get_group_id(group_id)
+            if db.main_group_exists(group_id):
+                overall = db.stat_group(group_id)
+                all_users = dg.stat_all_users(group_id)
+
+                z = [[user[1], user[0]] for user in all_users if user[1] != 0]
+                o = [[user[2], user[0]] for user in all_users if user[2] != 0]
+                p = [[user[3], user[0]] for user in all_users if user[3] != 0]
+
+                txt = f"<i><b>Всего было сделано заказов - {sum(overall)}</b></i>\n"
+                line = morph.parse('заказ')[0]
+
+                lst = [[f"\n\t<b>* Завтраков - {str(overall[0])}</b>\n", z], [f"\n\t<b>* Обедов - {str(overall[1])}</b>\n", o],
+                       [f"\n\t<b>* Полдников - {str(overall[2])}</b>\n", p]]
+                for i in lst:
+                    txt = txt + i[0]
+                    if i[1]:
+                        for n, j in enumerate(i[1][:3]):
+                            txt = txt + "\t\t\t<b>" + str(n + 1) + ". " + j[1] + "</b> " + str(j[0]) + " " + line.make_agree_with_number(j[0]).word + "\n"
+
+                await message.answer(txt, types.ParseMode.HTML)
+            else:
+                await message.answer("Ваша группа не зарегистрирована!")
+        else:
+            await message.answer("Ваша группа не зарегистрирована!")
 
 
 @dp.message_handler(commands="eat")
@@ -195,29 +237,51 @@ async def var(call: types.CallbackQuery):
     if du.group_exists(group_id):
         group_id = du.get_group_id(group_id)
         if db.main_group_exists(group_id):
+            user_id = call.from_user.id
+            if du.user_exists(user_id):
+                user_id = du.get_user_id(user_id)
+            else:
+                du.add_user(user_id)
+                user_id = du.get_user_id(user_id)
 
-            for i in str(call.data):
-                db.upd_stat_group(group_id, i)
+            if db.check_group_inproc(group_id):
+                if not dn.check_user(group_id, user_id):
+                    flag = True
+                else:
+                    await call.message.answer(f"{call.from_user.first_name}, вы уже сделали заказ! Отмените его с "
+                                              f"помощью кнопки отмены!")
+                    flag = False
+            else:
+                dn.created_group(group_id)
+                db.add_group(group_id)
+                flag = True
 
-            ids = db.get_spec_group(group_id)
-            await bot.send_message(chat_id=str(du.get_first_group_id(ids)),
-                                   text=f'[{call.from_user.first_name}](tg://user?id={call.from_user.id}) >> '
-                                        f'*{et[call.data].title()}*', parse_mode=types.ParseMode.MARKDOWN)
+            if flag:
+                for i in str(call.data):
+                    db.upd_stat_group(group_id, i, 1)
+                    dg.upd_stat_user(group_id, user_id, i, 1)
 
-            await call.message.answer(text=f'{call.from_user.first_name}, всё принято, вы заказили - '
-                                           f'*{"и".join(et[call.data].split("/"))}*',
-                                      parse_mode=types.ParseMode.MARKDOWN)
+                ids = db.get_spec_group(group_id)
+                msg1 = await bot.send_message(chat_id=str(du.get_first_group_id(ids)),
+                                              text=f'[{call.from_user.first_name}](tg://user?id={call.from_user.id}) >> '
+                                                   f'*{et[call.data].title()}*', parse_mode=types.ParseMode.MARKDOWN)
+
+                msg2 = await call.message.answer(text=f'{call.from_user.first_name}, всё принято, вы заказили - '
+                                                      f'*{"и".join(et[call.data].split("/"))}*',
+                                                 parse_mode=types.ParseMode.MARKDOWN)
+
+                dn.add_user(group_id, user_id, msg2.message_id, msg1.message_id, str(call.data))
         else:
-            await call.message.answer(text=f'Вы ещё не можете использовать бота, завершите процедуру регистрации!',
-                                      parse_mode=types.ParseMode.MARKDOWN)
+            await call.message.answer('Вы должны через личные сообщения зарегистрировать этот чат у бота вместе с '
+                                      'дополнительным для отправки списка!')
     else:
-        await call.message.answer(text=f'Вы должны через личные сообщения зарегистрировать этот чат у бота вместе с '
-                                       f'дополнительным для отправки списка!', parse_mode=types.ParseMode.MARKDOWN)
+        await call.message.answer('Вы должны через личные сообщения зарегистрировать этот чат у бота вместе с '
+                                  'дополнительным для отправки списка!')
 
 
 @dp.callback_query_handler(text=["cnl"])
 async def cnl(call: types.CallbackQuery):
-    user_id = du.get_user_id(call.message.chat.id)
+    user_id = du.get_user_id(call.from_user.id)
     if db.user_tranzit_exists(user_id):
         db.delete_tranzit(user_id)
         await call.message.answer('<b>Заявка удалена!</b> Если ещё захотите связать группы, то зановой вызовите '
@@ -228,11 +292,12 @@ async def cnl(call: types.CallbackQuery):
 
 @dp.callback_query_handler(text=["del"])
 async def ver_del(call: types.CallbackQuery):
-    user_id = du.get_user_id(call.message.chat.id)
+    user_id = du.get_user_id(call.from_user.id)
     if db.user_main_exists(user_id):
         ids = db.get_main_group(user_id)
         db.delete_main_group(user_id)
         dg.delete_group(str(ids))
+        db.del_group(str(ids))
         await call.message.answer('Всё успешно удалено!')
     else:
         await call.message.answer("У вас нет связки групп для их удаления!")
@@ -240,7 +305,44 @@ async def ver_del(call: types.CallbackQuery):
 
 @dp.callback_query_handler(text=["cancel"])
 async def cancel(call: types.CallbackQuery):
-    pass
+    group_id = call.message.chat.id
+    if du.group_exists(group_id):
+        main_group_id = group_id
+        group_id = du.get_group_id(group_id)
+        if db.main_group_exists(group_id):
+            user_id = call.from_user.id
+            if du.user_exists(user_id):
+                user_id = du.get_user_id(user_id)
+            else:
+                du.add_user(user_id)
+                user_id = du.get_user_id(user_id)
+
+            if db.check_group_inproc(group_id):
+                if dn.check_user(group_id, user_id):
+                    ord_id = dn.get_ord_id(group_id, user_id)
+
+                    for i in ord_id:
+                        db.upd_stat_group(group_id, i, -1)
+                        dg.upd_stat_user(group_id, user_id, i, -1)
+
+                    ids = db.get_spec_group(group_id)
+                    set_group_id = str(du.get_first_group_id(ids))
+
+                    main, sett = dn.get_message(group_id, user_id)
+                    await bot.delete_message(chat_id=main_group_id, message_id=main)
+                    await bot.delete_message(chat_id=set_group_id, message_id=sett)
+
+                    dn.del_user(group_id, user_id)
+                    await call.message.answer(f"{call.from_user.first_name}, ваш заказ отменён!")
+                else:
+                    await call.message.answer(f"{call.from_user.first_name}, у вас нет заказа!")
+            else:
+                await call.message.answer(f"{call.from_user.first_name}, у вас нет заказа!")
+        else:
+            await call.message.answer('Вы ещё не можете использовать бота, завершите процедуру регистрации!')
+    else:
+        await call.message.answer('Вы должны через личные сообщения зарегистрировать этот чат у бота вместе с '
+                                  'дополнительным для отправки списка!')
 
 
 # ТРЕКЕР НОВЫХ ПОЛЬЗОВАТЕЛЕЙ
@@ -282,6 +384,11 @@ async def check(message: types.Message):
                     db.delete_tranzit(user_id)
                     dg.created_group(ids[0])
                     dg.add_user(ids[0], user_id, message.from_user.first_name)
+            else:
+                if du.group_exists(message.chat.id):
+                    group_id = du.get_group_id(message.chat.id)
+                    if db.main_group_exists(group_id):
+                        dg.update_name(user_id, message.from_user.first_name, group_id)
         else:
             if du.group_exists(message.chat.id):
                 group_id = du.get_group_id(message.chat.id)
@@ -302,7 +409,7 @@ async def time(wait_for):
 
         data = db.get_day()
 
-        if date != data and hour == 11:
+        if date != data and hour == 6:
             for ids in db.get_spec_groups():
                 group = du.get_first_group_id(ids[0])
 
@@ -316,9 +423,11 @@ async def time(wait_for):
                                            parse_mode=types.ParseMode.HTML)
 
             db.update_day(date)
-            os.remove("now.db")
-            file = open("now.db")
-            file.close()
+            db.reset_proc()
+
+            os.remove('../db/now.db')
+            fle = open('../db/now.db', 'w+')
+            fle.close()
 
 
 if __name__ == '__main__':

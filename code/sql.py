@@ -117,55 +117,47 @@ class Base:
         with self.connection:
             return self.cursor.execute(f'DELETE FROM `main` WHERE `user_id` = ?', (user_id,))
 
-    def upd_stat_group(self, group_id, var):
+    def upd_stat_group(self, group_id, var, count):
         """Обновляем статистику"""
         with self.connection:
             self.cursor.execute("SELECT `zav`, `obe`, `pol` FROM `main` WHERE `main_group_id` = ?", (group_id,))
             if var == "z":
                 return self.cursor.execute("UPDATE `main` SET `zav` = ? WHERE `main_group_id` = ?",
-                                           ((self.cursor.fetchone()[0] + 1), group_id))
+                                           ((self.cursor.fetchone()[0] + count), group_id))
             elif var == 'o':
                 return self.cursor.execute("UPDATE `main` SET `obe` = ? WHERE `main_group_id` = ?",
-                                           ((self.cursor.fetchone()[1] + 1), group_id))
+                                           ((self.cursor.fetchone()[1] + count), group_id))
             elif var == 'p':
                 return self.cursor.execute("UPDATE `main` SET `pol` = ? WHERE `main_group_id` = ?",
-                                           ((self.cursor.fetchone()[2] + 1), group_id))
+                                           ((self.cursor.fetchone()[2] + count), group_id))
 
-    #
-    def update_status_group(self, id_group, status):
-        """Обновляем статус группы"""
-        with self.connection:
-            return self.cursor.execute("UPDATE `group` SET `status` = ? WHERE `id_group` = ?", (status, id_group))
-
-    def get_group(self, status=True):
-        """Получаем все активные группы"""
-        with self.connection:
-            return self.cursor.execute("SELECT * FROM `group` WHERE `status` = ?", (status,)).fetchall()
-
-    def id_group_lst(self, status=True):
-        """Список айди активных групп"""
-        with self.connection:
-            return [i[1] for i in self.cursor.execute("SELECT * FROM `group` WHERE `status` = ?", (status,)).fetchall()]
-
-    def stat_element_group(self, id_group):
+    def stat_group(self, group_id):
         """Получение данных группы"""
         with self.connection:
-            self.cursor.execute("SELECT * FROM `group` WHERE `id_group` = ?", (id_group,))
-            data = self.cursor.fetchone()
-            time, message, reply, command, url = int(data[3]), int(data[4]), int(data[5]), int(data[6]), int(data[7])
-            tik_tok, media, sticker, voice = int(data[8]), int(data[9]), int(data[10]), int(data[11])
-            bol, cool = int(data[12]), int(data[13])
-            return [message, reply, command, url, tik_tok, media, sticker, voice, time, bol, cool]
+            return self.cursor.execute("SELECT `zav`, `obe`, `pol` FROM `main` WHERE `main_group_id` = ?",
+                                       (group_id,)).fetchone()
 
-    def id_lst(self, db):
-        """Список айди"""
+    # ПРОЦЕСС
+    def check_group_inproc(self, group_id):
+        """Проверка на наличие таблицы с заказами"""
         with self.connection:
-            return [i[0] for i in self.cursor.execute(f'SELECT id_user FROM `{db}`').fetchall()]
+            result = self.cursor.execute(f'SELECT * FROM `proc` WHERE `group_id` = ?', (group_id,)).fetchall()
+            return bool(len(result))
 
-    def name_lst(self, db):
-        """Список имён"""
+    def add_group(self, group_id):
+        """Добавляем нового пользователя из транзита"""
         with self.connection:
-            return [i[0] for i in self.cursor.execute(f'SELECT first_name FROM `{db}`').fetchall()]
+            return self.cursor.execute(f"INSERT INTO `proc` (`group_id`) VALUES(?)", (group_id,))
+
+    def reset_proc(self):
+        """Удаление всех групп"""
+        with self.connection:
+            return self.cursor.execute('DELETE FROM `proc`')
+
+    def del_group(self, group_id):
+        """Удаление ненужного транзита"""
+        with self.connection:
+            return self.cursor.execute(f'DELETE FROM `proc` WHERE `group_id` = ?', (group_id,))
 
     # ЗАВЕРШЕНИЕ
     def close(self):
@@ -262,6 +254,25 @@ class Group:
         with self.connection:
             return self.cursor.execute(f"DROP TABLE IF EXISTS [{group_id}]")
 
+    def upd_stat_user(self, group_id, user_id, var, count):
+        """Обновляем статистику"""
+        with self.connection:
+            self.cursor.execute(f"SELECT `zav`, `obe`, `pol` FROM `{group_id}` WHERE `user_id` = ?", (user_id,))
+            if var == "z":
+                return self.cursor.execute(f"UPDATE `{group_id}` SET `zav` = ? WHERE `user_id` = ?",
+                                           (str(self.cursor.fetchone()[0] + count), user_id))
+            elif var == 'o':
+                return self.cursor.execute(f"UPDATE `{group_id}` SET `obe` = ? WHERE `user_id` = ?",
+                                           (str(self.cursor.fetchone()[1] + count), user_id))
+            elif var == 'p':
+                return self.cursor.execute(f"UPDATE `{group_id}` SET `pol` = ? WHERE `user_id` = ?",
+                                           (str(self.cursor.fetchone()[2] + count), user_id))
+
+    def stat_all_users(self, group_id):
+        """Список имён"""
+        with self.connection:
+            return self.cursor.execute(f'SELECT `first_name`, `zav`, `obe`, `pol` FROM `{group_id}`').fetchall()
+
     def close(self):
         """Закрываем соединение с БД"""
         self.connection.close()
@@ -280,14 +291,19 @@ class Now:
                                             user_id      INTEGER    NOT NULL,
                                             main_mess_id INTEGER    NOT NULL,
                                             set_mess_id  INTEGER    NOT NULL,
-                                            ord_id       STRING (1) NOT NULL
+                                            ord_id       STRING     NOT NULL
                                             );""")
 
     def add_user(self, group_id, user_id, main_mess, set_mess, ord_id):
         """Добавляем нового пользователя"""
         with self.connection:
-            return self.cursor.execute(f"INSERT INTO `{group_id}` (`user_id`, `main_mess_id`, `set_mess_id`, `ord_id `)"
+            return self.cursor.execute(f"INSERT INTO `{group_id}` (`user_id`, `main_mess_id`, `set_mess_id`, `ord_id`)"
                                        f" VALUES(?,?,?,?)", (user_id, main_mess, set_mess, ord_id))
+
+    def del_user(self, group_id, user_id):
+        """Удаление пользователя"""
+        with self.connection:
+            return self.cursor.execute(f'DELETE FROM `{group_id}` WHERE `user_id` = ?', (user_id,))
 
     def delete_group(self, group_id):
         """Удаление таблицы с информацией"""
@@ -300,10 +316,17 @@ class Now:
             result = self.cursor.execute(f'SELECT * FROM `{group_id}` WHERE `user_id` = ?', (user_id,)).fetchall()
             return bool(len(result))
 
-    def check_group(self):
-        """Проверка на наличие таблицы с заказами"""
+    def get_ord_id(self, group_id, user_id):
+        """Проверяем, есть ли уже юзер в базе"""
         with self.connection:
-            pass
+            return self.cursor.execute(f'SELECT `ord_id` FROM `{group_id}` WHERE `user_id` = ?',
+                                       (user_id,)).fetchone()[0]
+
+    def get_message(self, group_id, user_id):
+        """Проверяем, есть ли уже юзер в базе"""
+        with self.connection:
+            return self.cursor.execute(f'SELECT `main_mess_id`, `set_mess_id` FROM `{group_id}` WHERE `user_id` = ?',
+                                       (user_id,)).fetchone()
 
     def close(self):
         """Закрываем соединение с БД"""
