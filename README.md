@@ -138,7 +138,9 @@ python bot.py
 ## 👥 Автор
 
 **Деев Егор Викторович** - Backend Developer  
-🌐 [deev.space](https://deev.space) | 📧 egor@deev.space | 🔵 [@Egor_Deev](https://t.me/Egor_Deev)
+- GitHub: [@EDeev](https://github.com/EDeev)
+- Email: egor@deev.space
+- Telegram: [@Egor_Deev](https://t.me/Egor_Deev)
 
 ## 📋 Лицензия
 
