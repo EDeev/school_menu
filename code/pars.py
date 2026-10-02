@@ -1,6 +1,23 @@
+import ast
+import operator
 import requests as req
 import datetime as dt
 import openpyxl, os, re
+
+_OPS = {ast.Add: operator.add, ast.Sub: operator.sub, ast.Mult: operator.mul, ast.Div: operator.truediv}
+
+
+def arithmetic(text):
+    """Значение ячейки вида «150» или «150+30»: только числа и + - * /, без eval."""
+    def calc(node):
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return node.value
+        if isinstance(node, ast.BinOp) and type(node.op) in _OPS:
+            return _OPS[type(node.op)](calc(node.left), calc(node.right))
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+            return -calc(node.operand)
+        raise ValueError(f"недопустимое значение в ячейке: {text!r}")
+    return calc(ast.parse(text, mode="eval").body)
 
 
 def eating(day):
@@ -38,8 +55,8 @@ def eating(day):
                     if employees_sheet[f"D{j[1] + i}"].value is None:
                         continue
 
-                    gramm = str(int(eval(str(employees_sheet[f"E{j[1] + i}"].value).strip())))
-                    kkal = str(eval("".join(str(employees_sheet[f"J{j[1] + i}"].value).split()).replace(",", ".", 1)))
+                    gramm = str(int(arithmetic(str(employees_sheet[f"E{j[1] + i}"].value).strip())))
+                    kkal = str(arithmetic("".join(str(employees_sheet[f"J{j[1] + i}"].value).split()).replace(",", ".", 1)))
 
                     food[j[0]].append([employees_sheet[f"D{j[1] + i}"].value, [gramm, kkal]])
 
