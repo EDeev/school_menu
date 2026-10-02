@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install ruff==0.14.0 openpyxl==3.1.2 requests==2.31.0
+      - name: Синтаксис и неопределённые имена
+        run: ruff check --select E9,F821,F811 . && python -m py_compile code/*.py
+      - name: Разбор ячеек меню без eval
+        working-directory: code
+        run: |
+          python -c "
+          from pars import arithmetic
+          assert arithmetic('150+30') == 180 and arithmetic('12.5') == 12.5
+          try:
+              arithmetic('__import__(\"os\")')
+              raise SystemExit('eval-подобный ввод не отвергнут')
+          except ValueError:
+              pass"
