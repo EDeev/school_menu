@@ -3,6 +3,7 @@
 **Русский** · [English](README.en.md)
 
 [![CI](https://github.com/EDeev/school_menu/actions/workflows/ci.yml/badge.svg)](https://github.com/EDeev/school_menu/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/EDeev/school_menu)](https://github.com/EDeev/school_menu/releases)
 
 Telegram-бот школьной столовой: каждое утро присылает меню с сайта школы, принимает заказы завтраков,
 обедов и полдников по классам и собирает сводку для столовой.
@@ -24,6 +25,9 @@ cd code && BOT_TOKEN=токен BOT_ID=id_бота TECH_GROUP_ID=id_группы
 ```
 
 Граммовка и калорийность из Excel разбираются без `eval`: допускаются только числа и `+ - * /`.
+
+**Docker:** `docker run -d -e BOT_TOKEN=токен -e BOT_ID=id_бота -e TECH_GROUP_ID=id_группы -v school-menu-db:/app/db ghcr.io/edeev/school_menu`
+(то же — `git.deev.su/edeev/school_menu`); при первом запуске в том копируются базы из репозитория.
 
 ## Лицензия
 

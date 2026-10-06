@@ -3,6 +3,7 @@
 [Русский](README.md) · **English**
 
 [![CI](https://github.com/EDeev/school_menu/actions/workflows/ci.yml/badge.svg)](https://github.com/EDeev/school_menu/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/EDeev/school_menu)](https://github.com/EDeev/school_menu/releases)
 
 A school cafeteria Telegram bot: every morning it posts the menu from the school website, takes breakfast,
 lunch and snack orders by class and compiles a summary for the cafeteria.
@@ -24,6 +25,9 @@ cd code && BOT_TOKEN=token BOT_ID=bot_id TECH_GROUP_ID=group_id python bot.py
 ```
 
 Portion weights and calories from Excel are parsed without `eval`: only numbers and `+ - * /` are allowed.
+
+**Docker:** `docker run -d -e BOT_TOKEN=token -e BOT_ID=bot_id -e TECH_GROUP_ID=group_id -v school-menu-db:/app/db ghcr.io/edeev/school_menu`
+(same as `git.deev.su/edeev/school_menu`); on first start the databases from the repository are copied into the volume.
 
 ## License
 
